@@ -68,7 +68,10 @@ angular.module('mm.foundation.accordion', [])
       };
     },
     link: function(scope, element, attrs, accordionCtrl) {
-      var getIsOpen, setIsOpen;
+      var getIsOpen, setIsOpen,
+          keyCodes = {
+            RETURNKEY : 13
+          };
 
       accordionCtrl.addGroup(scope);
 
@@ -91,6 +94,13 @@ angular.module('mm.foundation.accordion', [])
           setIsOpen(scope.$parent, value);
         }
       });
+
+      scope.onKeydown = function($event) {
+        var e = $event;
+        if (e.keyCode == keyCodes.RETURNKEY) {
+            scope.isOpen = !scope.isOpen;
+        }
+      }
     }
   };
 }])
