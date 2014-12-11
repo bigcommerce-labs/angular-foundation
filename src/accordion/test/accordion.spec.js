@@ -126,8 +126,8 @@ describe('accordion', function () {
       beforeEach(function () {
         var tpl =
           "<accordion>" +
-            "<accordion-group heading=\"title 1\">Content 1</accordion-group>" +
-            "<accordion-group heading=\"title 2\">Content 2</accordion-group>" +
+            "<accordion-group accordion-id='title-1' heading='title 1'>Content 1</accordion-group>" +
+            "<accordion-group accordion-id='title-2' heading='title 2'>Content 2</accordion-group>" +
             "</accordion>";
         element = angular.element(tpl);
         $compile(element)(scope);
@@ -165,6 +165,16 @@ describe('accordion', function () {
         scope.$digest();
         expect(findGroupBody(0).scope().isOpen).toBe(false);
       });
+
+      it('should set the id of the content', function () {
+        expect(findGroupBody(0).attr('id')).toEqual('title-1');
+        expect(findGroupBody(1).attr('id')).toEqual('title-2');
+      });
+
+      it('should set the href to the id of the content', function () {
+        expect(findGroupLink(0).attr('href')).toEqual('#title-1');
+        expect(findGroupLink(1).attr('href')).toEqual('#title-2');
+      });
     });
 
     describe('with dynamic panels', function () {
@@ -172,12 +182,12 @@ describe('accordion', function () {
       beforeEach(function () {
         var tpl =
           "<accordion>" +
-            "<accordion-group ng-repeat='group in groups' heading='{{group.name}}'>{{group.content}}</accordion-group>" +
+            "<accordion-group accordion-id='{{group.id}}' ng-repeat='group in groups' heading='{{group.name}}'>{{group.content}}</accordion-group>" +
           "</accordion>";
         element = angular.element(tpl);
         model = [
-          {name: 'title 1', content: 'Content 1'},
-          {name: 'title 2', content: 'Content 2'}
+          {id:'title-1', name: 'title 1', content: 'Content 1'},
+          {id:'title-2', name: 'title 2', content: 'Content 2'}
         ];
 
         $compile(element)(scope);
@@ -194,8 +204,12 @@ describe('accordion', function () {
         scope.$digest();
         groups = element.find('dd');
         expect(groups.length).toEqual(2);
+        expect(findGroupBody(0).attr('id')).toEqual('title-1');
+        expect(findGroupLink(0).attr('href')).toEqual('#title-1');
         expect(findGroupLink(0).text()).toEqual('title 1');
         expect(findGroupBody(0).text().trim()).toEqual('Content 1');
+        expect(findGroupBody(1).attr('id')).toEqual('title-2');
+        expect(findGroupLink(1).attr('href')).toEqual('#title-2');
         expect(findGroupLink(1).text()).toEqual('title 2');
         expect(findGroupBody(1).text().trim()).toEqual('Content 2');
       });
@@ -240,6 +254,39 @@ describe('accordion', function () {
         findGroupLink(0).click();
         scope.$digest();
         expect(scope.open.second).toBe(false);
+      });
+    });
+
+    describe('setOpen function', function () {
+      beforeEach(function () {
+        var tpl =
+          "<accordion>" +
+            "<accordion-group accordion-id='title-1' heading='title 1'>Content 1</accordion-group>" +
+            "<accordion-group accordion-id='title-2' heading='title 2'>Content 2</accordion-group>" +
+            "</accordion>";
+        element = angular.element(tpl);
+        $compile(element)(scope);
+        scope.$digest();
+        groups = element.find('dd');
+      });
+
+      it('should open the panel on click', function () {
+        findGroupLink(0).click();
+        scope.$digest();
+        expect(findGroupBody(0).scope().isOpen).toBe(true);
+        expect(findGroupBody(1).scope().isOpen).toBe(false);
+      });
+
+      it('should not update browser url with the href on click', function () {
+        var wasDefaultPrevented = false;
+        element.on('click', function(event) {
+          if (event.isDefaultPrevented()) {
+            wasDefaultPrevented = true;
+          }
+        });
+        findGroupLink(1).click();
+        scope.$digest();
+        expect(wasDefaultPrevented).toBe(true);
       });
     });
 
