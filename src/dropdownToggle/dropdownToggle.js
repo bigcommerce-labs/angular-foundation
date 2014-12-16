@@ -27,83 +27,98 @@ angular.module('mm.foundation.dropdownToggle', [ 'mm.foundation.position', 'mm.f
       dropdownToggle: '@'
     },
     controller: 'DropdownToggleController',
-    link: function(scope, element, attrs, controller) {
-      var parent = element.parent();
-      var dropdown = angular.element($document[0].querySelector(scope.dropdownToggle));
-
-      var parentHasDropdown = function() {
-        return parent.hasClass('has-dropdown');
-      };
-
-      var onClick = function (event) {
-        dropdown = angular.element($document[0].querySelector(scope.dropdownToggle));
-        var elementWasOpen = (element === openElement);
-
-        event.preventDefault();
-        event.stopPropagation();
-
-        if (!!openElement) {
-          closeMenu();
-        }
-
-        if (!elementWasOpen && !element.hasClass('disabled') && !element.prop('disabled')) {
-          dropdown.css('display', 'block'); // We display the element so that offsetParent is populated
-          var offset = $position.offset(element);
-          var parentOffset = $position.offset(angular.element(dropdown[0].offsetParent));
-          var dropdownWidth = dropdown.prop('offsetWidth');
-          var css = {
-            top: offset.top - parentOffset.top + offset.height + 'px'
-          };
-
-          if (controller.small()) {
-            css.left = Math.max((parentOffset.width - dropdownWidth) / 2, 8) + 'px';
-            css.position = 'absolute';
-            css.width = '95%';
-            css['max-width'] = 'none';
-          }
-          else {
-            var left = Math.round(offset.left - parentOffset.left);
-            var rightThreshold = $window.innerWidth - dropdownWidth - 8;
-            if (left > rightThreshold) {
-                left = rightThreshold;
-                dropdown.removeClass('left').addClass('right');
-            }
-            css.left = left + 'px';
-            css.position = null;
-            css['max-width'] = null;
-          }
-
-          dropdown.css(css);
-
-          if (parentHasDropdown()) {
-            parent.addClass('hover');
-          }
-
-          openElement = element;
-
-          closeMenu = function (event) {
-            $document.off('click', closeMenu);
-            dropdown.css('display', 'none');
-            closeMenu = angular.noop;
-            openElement = null;
-            if (parent.hasClass('hover')) {
-              parent.removeClass('hover');
-            }
-          };
-          $document.on('click', closeMenu);
-        }
-      };
-
-      if (dropdown) {
-        dropdown.css('display', 'none');
+    compile: function(tElement, tAttrs) {
+      if (tAttrs.tabindex === undefined) {
+        tElement.attr('tabindex', 0);
       }
 
-      scope.$watch('$location.path', function() { closeMenu(); });
+      return function (scope, element, attrs, controller) {
+        var parent = element.parent();
+        var dropdown = angular.element($document[0].querySelector(scope.dropdownToggle));
 
-      element.on('click', onClick);
-      element.on('$destroy', function() {
-        element.off('click', onClick);
-      });
+        var parentHasDropdown = function () {
+          return parent.hasClass('has-dropdown');
+        };
+
+        var onClick = function (event, tabPressed) {
+          dropdown = angular.element($document[0].querySelector(scope.dropdownToggle));
+          var elementWasOpen = (element === openElement);
+
+          if (elementWasOpen && tabPressed) {
+            return;
+          }
+
+          event.preventDefault();
+          event.stopPropagation();
+
+          if (!!openElement) {
+            closeMenu();
+          }
+
+          if (!elementWasOpen && !element.hasClass('disabled') && !element.prop('disabled')) {
+            dropdown.css('display', 'block'); // We display the element so that offsetParent is populated
+            var offset = $position.offset(element);
+            var parentOffset = $position.offset(angular.element(dropdown[0].offsetParent));
+            var dropdownWidth = dropdown.prop('offsetWidth');
+            var css = {
+              top: offset.top - parentOffset.top + offset.height + 'px'
+            };
+
+            if (controller.small()) {
+              css.left = Math.max((parentOffset.width - dropdownWidth) / 2, 8) + 'px';
+              css.position = 'absolute';
+              css.width = '95%';
+              css['max-width'] = 'none';
+            }
+            else {
+              var left = Math.round(offset.left - parentOffset.left);
+              var rightThreshold = $window.innerWidth - dropdownWidth - 8;
+              if (left > rightThreshold) {
+                left = rightThreshold;
+                dropdown.removeClass('left').addClass('right');
+              }
+              css.left = left + 'px';
+              css.position = null;
+              css['max-width'] = null;
+            }
+
+            dropdown.css(css);
+
+            if (parentHasDropdown()) {
+              parent.addClass('hover');
+            }
+
+            openElement = element;
+
+            closeMenu = function (event) {
+              $document.off('click', closeMenu);
+              dropdown.css('display', 'none');
+              closeMenu = angular.noop;
+              openElement = null;
+              if (parent.hasClass('hover')) {
+                parent.removeClass('hover');
+              }
+            };
+            $document.on('click', closeMenu);
+          }
+        };
+
+        if (dropdown) {
+          dropdown.css('display', 'none');
+        }
+
+        scope.$watch('$location.path', function () { closeMenu(); });
+
+        element.on('click', onClick);
+        element.on('keydown', function (e) {
+          if (e.keyCode === 9) {
+            onClick(e, true);
+          }
+        });
+        element.on('$destroy', function () {
+          element.off('click', onClick);
+        });
+      };
     }
   };
 }]);
