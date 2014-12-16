@@ -67,6 +67,13 @@ describe('dropdownToggle', function() {
       $rootScope.$apply();
       expect(targetElm.css('display')).toBe('none');
     });
+
+    it('should open when tab is pressed', function() {
+      var e = angular.element.Event('keydown');
+      e.which = 9;
+      toggleElm.triggerHandler(e);
+      expect(targetElm.css('display')).toBe('block');
+    });
   });
 
   describe('with multiple dropdowns', function() {
