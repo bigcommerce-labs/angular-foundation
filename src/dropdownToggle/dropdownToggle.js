@@ -111,7 +111,7 @@ angular.module('mm.foundation.dropdownToggle', [ 'mm.foundation.position', 'mm.f
 
         element.on('click', onClick);
         element.on('keydown', function (e) {
-          if (e.keyCode === 9) {
+          if ((e.which || e.keyCode) === 9) {
             onClick(e, true);
           }
         });
