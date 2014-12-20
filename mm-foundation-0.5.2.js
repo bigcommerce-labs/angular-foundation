@@ -1,12 +1,12 @@
 /*
  * angular-mm-foundation
- * http://angular-ui.github.io/bootstrap/
+ * http://pineconellc.github.io/angular-foundation/
 
- * Version: 0.0.0 - 2014-01-24
+ * Version: 0.6.0-SNAPSHOT - 2014-12-19
  * License: MIT
+ * (c) Pinecone, LLC
  */
-angular.module("mm.foundation", ["mm.foundation.tpls", "mm.foundation.accordion","mm.foundation.alert","mm.foundation.bindHtml","mm.foundation.buttons","mm.foundation.position","mm.foundation.dropdownToggle","mm.foundation.transition","mm.foundation.modal","mm.foundation.pagination","mm.foundation.tooltip","mm.foundation.popover","mm.foundation.progressbar","mm.foundation.rating","mm.foundation.tabs","mm.foundation.tour","mm.foundation.typeahead"]);
-angular.module("mm.foundation.tpls", ["template/accordion/accordion-group.html","template/accordion/accordion.html","template/alert/alert.html","template/modal/backdrop.html","template/modal/window.html","template/pagination/pager.html","template/pagination/pagination.html","template/tooltip/tooltip-html-unsafe-popup.html","template/tooltip/tooltip-popup.html","template/popover/popover.html","template/progressbar/bar.html","template/progressbar/progress.html","template/progressbar/progressbar.html","template/rating/rating.html","template/tabs/tab.html","template/tabs/tabset.html","template/tour/tour.html","template/typeahead/typeahead-match.html","template/typeahead/typeahead-popup.html"]);
+angular.module("mm.foundation", ["mm.foundation.accordion","mm.foundation.alert","mm.foundation.bindHtml","mm.foundation.buttons","mm.foundation.position","mm.foundation.mediaQueries","mm.foundation.dropdownToggle","mm.foundation.interchange","mm.foundation.transition","mm.foundation.modal","mm.foundation.offcanvas","mm.foundation.pagination","mm.foundation.tooltip","mm.foundation.popover","mm.foundation.progressbar","mm.foundation.rating","mm.foundation.tabs","mm.foundation.topbar","mm.foundation.tour","mm.foundation.typeahead"]);
 angular.module('mm.foundation.accordion', [])
 
 .constant('accordionConfig', {
@@ -70,7 +70,7 @@ angular.module('mm.foundation.accordion', [])
     transclude:true,              // It transcludes the contents of the directive into the template
     replace: true,                // The element containing the directive will be replaced with the template
     templateUrl:'template/accordion/accordion-group.html',
-    scope:{ heading:'@' },        // Create an isolated scope and interpolate the heading attribute onto this scope
+    scope:{ heading:'@', accordionId:'@' },        // Create an isolated scope and interpolate the heading attribute onto this scope
     controller: function() {
       this.setHeading = function(element) {
         this.heading = element;
@@ -82,6 +82,11 @@ angular.module('mm.foundation.accordion', [])
       accordionCtrl.addGroup(scope);
 
       scope.isOpen = false;
+
+      scope.setOpen = function($event) {
+        $event.preventDefault();
+        scope.isOpen = !scope.isOpen;
+      };
       
       if ( attrs.isOpen ) {
         getIsOpen = $parse(attrs.isOpen);
@@ -145,7 +150,6 @@ angular.module('mm.foundation.accordion', [])
     }
   };
 });
-
 angular.module("mm.foundation.alert", [])
 
 .controller('AlertController', ['$scope', '$attrs', function ($scope, $attrs) {
@@ -185,8 +189,8 @@ angular.module('mm.foundation.buttons', [])
 })
 
 .controller('ButtonsController', ['buttonConfig', function(buttonConfig) {
-  this.activeClass = buttonConfig.activeClass || 'active';
-  this.toggleEvent = buttonConfig.toggleEvent || 'click';
+  this.activeClass = buttonConfig.activeClass;
+  this.toggleEvent = buttonConfig.toggleEvent;
 }])
 
 .directive('btnRadio', function () {
@@ -331,22 +335,87 @@ angular.module('mm.foundation.position', [])
     };
   }]);
 
+angular.module("mm.foundation.mediaQueries", [])
+    .factory('matchMedia', ['$document', '$window', function($document, $window) {
+        // MatchMedia for IE <= 9
+        return $window.matchMedia || (function matchMedia(doc, undefined){
+            var bool,
+                docElem = doc.documentElement,
+                refNode = docElem.firstElementChild || docElem.firstChild,
+                // fakeBody required for <FF4 when executed in <head>
+                fakeBody = doc.createElement("body"),
+                div = doc.createElement("div");
+
+            div.id = "mq-test-1";
+            div.style.cssText = "position:absolute;top:-100em";
+            fakeBody.style.background = "none";
+            fakeBody.appendChild(div);
+
+            return function (q) {
+                div.innerHTML = "&shy;<style media=\"" + q + "\"> #mq-test-1 { width: 42px; }</style>";
+                docElem.insertBefore(fakeBody, refNode);
+                bool = div.offsetWidth === 42;
+                docElem.removeChild(fakeBody);
+                return {
+                    matches: bool,
+                    media: q
+                };
+            };
+
+        }($document[0]));
+    }])
+    .factory('mediaQueries', ['$document', 'matchMedia', function($document, matchMedia) {
+        var head = angular.element($document[0].querySelector('head'));
+        head.append('<meta class="foundation-mq-topbar" />');
+        head.append('<meta class="foundation-mq-small" />');
+        head.append('<meta class="foundation-mq-medium" />');
+        head.append('<meta class="foundation-mq-large" />');
+
+        var regex = /^[\/\\'"]+|(;\s?})+|[\/\\'"]+$/g;
+        var queries = {
+            topbar: getComputedStyle(head[0].querySelector('meta.foundation-mq-topbar')).fontFamily.replace(regex, ''),
+            small : getComputedStyle(head[0].querySelector('meta.foundation-mq-small')).fontFamily.replace(regex, ''),
+            medium : getComputedStyle(head[0].querySelector('meta.foundation-mq-medium')).fontFamily.replace(regex, ''),
+            large : getComputedStyle(head[0].querySelector('meta.foundation-mq-large')).fontFamily.replace(regex, '')
+        };
+
+        return {
+            topbarBreakpoint: function () {
+                return !matchMedia(queries.topbar).matches;
+            },
+            small: function () {
+                return matchMedia(queries.small).matches;
+            },
+            medium: function () {
+                return matchMedia(queries.medium).matches;
+            },
+            large: function () {
+                return matchMedia(queries.large).matches;
+            }
+        };
+    }]);
+
 /*
- * dropdownToggle - Provides dropdown menu functionality in place of bootstrap js
+ * dropdownToggle - Provides dropdown menu functionality
  * @restrict class or attribute
  * @example:
-   <li class="dropdown">
-     <a class="dropdown-toggle">My Dropdown Menu</a>
-     <ul class="dropdown-menu">
-       <li ng-repeat="choice in dropChoices">
-         <a ng-href="{{choice.href}}">{{choice.text}}</a>
-       </li>
-     </ul>
-   </li>
- */
-angular.module('mm.foundation.dropdownToggle', [ 'mm.foundation.position' ])
 
-.directive('dropdownToggle', ['$document', '$location', '$position', function ($document, $location, $position) {
+   <a dropdown-toggle="#dropdown-menu">My Dropdown Menu</a>
+   <ul id="dropdown-menu" class="f-dropdown">
+     <li ng-repeat="choice in dropChoices">
+       <a ng-href="{{choice.href}}">{{choice.text}}</a>
+     </li>
+   </ul>
+ */
+angular.module('mm.foundation.dropdownToggle', [ 'mm.foundation.position', 'mm.foundation.mediaQueries' ])
+
+.controller('DropdownToggleController', ['$scope', '$attrs', 'mediaQueries', function($scope, $attrs, mediaQueries) {
+  this.small = function() {
+    return mediaQueries.small() && !mediaQueries.medium();
+  };
+}])
+
+.directive('dropdownToggle', ['$document', '$window', '$location', '$position', function ($document, $window, $location, $position) {
   var openElement = null,
       closeMenu   = angular.noop;
   return {
@@ -354,50 +423,383 @@ angular.module('mm.foundation.dropdownToggle', [ 'mm.foundation.position' ])
     scope: {
       dropdownToggle: '@'
     },
-    link: function(scope, element, attrs) {
-      var dropdown = angular.element($document[0].querySelector(scope.dropdownToggle));
+    controller: 'DropdownToggleController',
+    compile: function(tElement, tAttrs) {
+      if (tAttrs.tabindex === undefined) {
+        tElement.attr('tabindex', 0);
+      }
 
-      scope.$watch('$location.path', function() { closeMenu(); });
-      dropdown.css('display', 'none').bind('click', function() { closeMenu(); });
-      element.bind('click', function (event) {
+      return function (scope, element, attrs, controller) {
+        var parent = element.parent();
+        var dropdown = angular.element($document[0].querySelector(scope.dropdownToggle));
 
-        var elementWasOpen = (element === openElement);
+        var parentHasDropdown = function () {
+          return parent.hasClass('has-dropdown');
+        };
 
-        event.preventDefault();
-        event.stopPropagation();
+        var onClick = function (event, tabPressed) {
+          dropdown = angular.element($document[0].querySelector(scope.dropdownToggle));
+          var elementWasOpen = (element === openElement);
 
-        if (!!openElement) {
-          closeMenu();
-        }
+          if (elementWasOpen && tabPressed) {
+            return;
+          }
 
-        if (!elementWasOpen && !element.hasClass('disabled') && !element.prop('disabled')) {
-          dropdown.css('display', 'block');
+          event.preventDefault();
+          event.stopPropagation();
 
-          var offset = $position.offset(element);
-          var parentOffset = $position.offset(angular.element(dropdown[0].offsetParent));
+          if (!!openElement) {
+            closeMenu();
+          }
 
-          dropdown.css({
-            left: offset.left - parentOffset.left + 'px',
-            top: offset.top - parentOffset.top + offset.height + 'px'
-          });
+          if (!elementWasOpen && !element.hasClass('disabled') && !element.prop('disabled')) {
+            dropdown.css('display', 'block'); // We display the element so that offsetParent is populated
+            var offset = $position.offset(element);
+            var parentOffset = $position.offset(angular.element(dropdown[0].offsetParent));
+            var dropdownWidth = dropdown.prop('offsetWidth');
+            var css = {
+              top: offset.top - parentOffset.top + offset.height + 'px'
+            };
 
-          openElement = element;
-          closeMenu = function (event) {
-            if (event) {
-              event.preventDefault();
-              event.stopPropagation();
+            if (controller.small()) {
+              css.left = Math.max((parentOffset.width - dropdownWidth) / 2, 8) + 'px';
+              css.position = 'absolute';
+              css.width = '95%';
+              css['max-width'] = 'none';
             }
-            $document.unbind('click', closeMenu);
-            dropdown.css('display', 'none');
-            closeMenu = angular.noop;
-            openElement = null;
-          };
-          $document.bind('click', closeMenu);
+            else {
+              var left = Math.round(offset.left - parentOffset.left);
+              var rightThreshold = $window.innerWidth - dropdownWidth - 8;
+              if (left > rightThreshold) {
+                left = rightThreshold;
+                dropdown.removeClass('left').addClass('right');
+              }
+              css.left = left + 'px';
+              css.position = null;
+              css['max-width'] = null;
+            }
+
+            dropdown.css(css);
+
+            if (parentHasDropdown()) {
+              parent.addClass('hover');
+            }
+
+            openElement = element;
+
+            closeMenu = function (event) {
+              $document.off('click', closeMenu);
+              dropdown.css('display', 'none');
+              closeMenu = angular.noop;
+              openElement = null;
+              if (parent.hasClass('hover')) {
+                parent.removeClass('hover');
+              }
+            };
+            $document.on('click', closeMenu);
+          }
+        };
+
+        if (dropdown) {
+          dropdown.css('display', 'none');
         }
-      });
+
+        scope.$watch('$location.path', function () { closeMenu(); });
+
+        element.on('click', onClick);
+        element.on('keydown', function (e) {
+          if ((e.which || e.keyCode) === 9) {
+            onClick(e, true);
+          }
+        });
+        element.on('$destroy', function () {
+          element.off('click', onClick);
+        });
+      };
     }
   };
 }]);
+
+/**
+ * @ngdoc service
+ * @name mm.foundation.interchange
+ * @description
+ *
+ * Package containing all services and directives
+ * about the `interchange` module
+ */
+angular.module('mm.foundation.interchange', ['mm.foundation.mediaQueries'])
+
+  /**
+   * @ngdoc function
+   * @name mm.foundation.interchange.interchageQuery
+   * @function interchageQuery
+   * @description
+   *
+   * this service inject meta tags objects in the head
+   * to get the list of media queries from Foundation
+   * stylesheets.
+   *
+   * @return {object} Queries list name => mediaQuery
+   */
+  .factory('interchangeQueries', ['$document', function ($document) {
+    var element,
+      mediaSize,
+      formatList = {
+      'default': 'only screen',
+      landscape : 'only screen and (orientation: landscape)',
+      portrait : 'only screen and (orientation: portrait)',
+      retina : 'only screen and (-webkit-min-device-pixel-ratio: 2),' +
+        'only screen and (min--moz-device-pixel-ratio: 2),' +
+        'only screen and (-o-min-device-pixel-ratio: 2/1),' +
+        'only screen and (min-device-pixel-ratio: 2),' +
+        'only screen and (min-resolution: 192dpi),' +
+        'only screen and (min-resolution: 2dppx)'
+    },
+    classPrefix = 'foundation-mq-',
+    classList = ['small', 'medium', 'large', 'xlarge', 'xxlarge'],
+    head = angular.element($document[0].querySelector('head'));
+
+    for (var i = 0; i < classList.length; i++) {
+      head.append('<meta class="' + classPrefix + classList[i] + '" />');
+      element = getComputedStyle(head[0].querySelector('meta.' + classPrefix + classList[i]));
+      mediaSize = element.fontFamily.replace(/^[\/\\'"]+|(;\s?})+|[\/\\'"]+$/g, '');
+      formatList[classList[i]] = mediaSize;
+    }
+    return formatList;
+  }])
+
+  /**
+   * @ngdoc function
+   * @name mm.foundation.interchange.interchangeQueriesManager
+   * @function interchangeQueriesManager
+   * @description
+   *
+   * interface to add and remove named queries
+   * in the interchangeQueries list
+   */
+  .factory('interchangeQueriesManager', ['interchangeQueries', function (interchangeQueries) {
+    return {
+      /**
+       * @ngdoc method
+       * @name interchangeQueriesManager#add
+       * @methodOf mm.foundation.interchange.interchangeQueriesManager
+       * @description
+       *
+       * Add a custom media query in the `interchangeQueries`
+       * factory. This method does not allow to update an existing
+       * media query.
+       *
+       * @param {string} name MediaQuery name
+       * @param {string} media MediaQuery
+       * @returns {boolean} True if the insert is a success
+       */
+      add: function (name, media) {
+        if (!name || !media ||
+          !angular.isString(name) || !angular.isString(media) ||
+          !!interchangeQueries[name]) {
+          return false;
+        }
+        interchangeQueries[name] = media;
+        return true;
+      }
+    };
+  }])
+
+  /**
+   * @ngdoc function
+   * @name mm.foundation.interchange.interchangeTools
+   * @function interchangeTools
+   * @description
+   *
+   * Tools to help with the `interchange` module.
+   */
+  .factory('interchangeTools', ['$window', 'matchMedia', 'interchangeQueries', function ($window, matchMedia, namedQueries) {
+
+    /**
+     * @ngdoc method
+     * @name interchangeTools#parseAttribute
+     * @methodOf mm.foundation.interchange.interchangeTools
+     * @description
+     *
+     * Attribute parser to transform an `interchange` attribute
+     * value to an object with media query (name or query) as key,
+     * and file to use as value.
+     *
+     * ```
+     * {
+     *   small: 'bridge-500.jpg',
+     *   large: 'bridge-1200.jpg'
+     * }
+     * ```
+     *
+     * @param {string} value Interchange query string
+     * @returns {object} Attribute parsed
+     */
+    var parseAttribute = function (value) {
+      var raw = value.split(/\[(.*?)\]/),
+        i = raw.length,
+        breaker = /^(.+)\,\ \((.+)\)$/,
+        breaked,
+        output = {};
+
+      while (i--) {
+        if (raw[i].replace(/[\W\d]+/, '').length > 4) {
+          breaked = breaker.exec(raw[i]);
+          if (!!breaked && breaked.length === 3) {
+            output[breaked[2]] = breaked[1];
+          }
+        }
+      }
+      return output;
+    };
+
+    /**
+     * @ngdoc method
+     * @name interchangeTools#findCurrentMediaFile
+     * @methodOf mm.foundation.interchange.interchangeTools
+     * @description
+     *
+     * Find the current item to display from a file list
+     * (object returned by `parseAttribute`) and the
+     * current page dimensions.
+     *
+     * ```
+     * {
+     *   small: 'bridge-500.jpg',
+     *   large: 'bridge-1200.jpg'
+     * }
+     * ```
+     *
+     * @param {object} files Parsed version of `interchange` attribute
+     * @returns {string} File to display (or `undefined`)
+     */
+    var findCurrentMediaFile = function (files) {
+      var file, media, match;
+      for (file in files) {
+        media = namedQueries[file] || file;
+        match = matchMedia(media);
+        if (match.matches) {
+          return files[file];
+        }
+      }
+      return;
+    };
+
+    return {
+      parseAttribute: parseAttribute,
+      findCurrentMediaFile: findCurrentMediaFile
+    };
+  }])
+
+  /**
+   * @ngdoc directive
+   * @name mm.foundation.interchange.directive:interchange
+   * @restrict A
+   * @element DIV|IMG
+   * @priority 450
+   * @scope true
+   * @description
+   *
+   * Interchange directive, following the same features as
+   * ZURB documentation. The directive is splitted in 3 parts.
+   *
+   * 1. This directive use `compile` and not `link` for a simple
+   * reason: if the method is applied on a DIV element to
+   * display a template, the compile method will inject an ng-include.
+   * Because using a `templateUrl` or `template` to do it wouldn't
+   * be appropriate for all cases (`IMG` or dynamic backgrounds).
+   * And doing it in `link` is too late to be applied.
+   *
+   * 2. In the `compile:post`, the attribute is parsed to find
+   * out the type of content to display.
+   *
+   * 3. At the start and on event `resize`, the method `replace`
+   * is called to reevaluate which file is supposed to be displayed
+   * and update the value if necessary. The methd will also
+   * trigger a `replace` event.
+   */
+  .directive('interchange', ['$window', '$rootScope', 'interchangeTools', function ($window, $rootScope, interchangeTools) {
+
+    var pictureFilePattern = /[A-Za-z0-9-_]+\.(jpg|jpeg|png|gif|bmp|tiff)\ *,/i;
+
+    return {
+      restrict: 'A',
+      scope: true,
+      priority: 450,
+      compile: function compile($element, attrs) {
+        // Set up the attribute to update
+        if ($element[0].nodeName === 'DIV' && !pictureFilePattern.test(attrs.interchange)) {
+          $element.html('<ng-include src="currentFile"></ng-include>');
+        }
+
+        return {
+          pre: function preLink($scope, $element, attrs) {},
+          post: function postLink($scope, $element, attrs) {
+            var currentFile, nodeName;
+
+            // Set up the attribute to update
+            nodeName = $element && $element[0] && $element[0].nodeName;
+            $scope.fileMap = interchangeTools.parseAttribute(attrs.interchange);
+
+            // Find the type of interchange
+            switch (nodeName) {
+            case 'DIV':
+              // If the tag is a div, we test the current file to see if it's picture
+              currentFile = interchangeTools.findCurrentMediaFile($scope.fileMap);
+              if (/[A-Za-z0-9-_]+\.(jpg|jpeg|png|gif|bmp|tiff)$/i.test(currentFile)) {
+                $scope.type = 'background';
+              }
+              else {
+                $scope.type = 'include';
+              }
+              break;
+
+            case 'IMG':
+              $scope.type = 'image';
+              break;
+
+            default:
+              return;
+            }
+
+            var replace = function (e) {
+              // The the new file to display (exit if the same)
+              var currentFile = interchangeTools.findCurrentMediaFile($scope.fileMap);
+              if (!!$scope.currentFile && $scope.currentFile === currentFile) {
+                return;
+              }
+
+              // Set up the new file
+              $scope.currentFile = currentFile;
+              switch ($scope.type) {
+              case 'image':
+                $element.attr('src', $scope.currentFile);
+                break;
+
+              case 'background':
+                $element.css('background-image', 'url(' + $scope.currentFile + ')');
+                break;
+              }
+
+              // Trigger events
+              $rootScope.$emit('replace', $element, $scope);
+              if (!!e) {
+                $scope.$apply();
+              }
+            };
+
+            // Start
+            replace();
+            $window.addEventListener('resize', replace);
+            $scope.$on('$destroy', function () {
+              $window.removeEventListener('resize', replace);
+            });
+          }
+        };
+      }
+    };
+  }]);
 
 angular.module('mm.foundation.transition', [])
 
@@ -583,15 +985,22 @@ angular.module('mm.foundation.modal', ['mm.foundation.transition'])
         $timeout(function () {
           // trigger CSS transitions
           scope.animate = true;
-          // focus a freshly-opened modal
-          element[0].focus();
+
+          // If the modal contains any autofocus elements refocus onto the first one
+          if (element[0].querySelectorAll('[autofocus]').length > 0) {
+            element[0].querySelectorAll('[autofocus]')[0].focus();
+          }
+          else{
+          // otherwise focus the freshly-opened modal
+            element[0].querySelector('div').focus();
+          }
         });
       }
     };
   }])
 
-  .factory('$modalStack', ['$transition', '$timeout', '$document', '$compile', '$rootScope', '$$stackedMap',
-    function ($transition, $timeout, $document, $compile, $rootScope, $$stackedMap) {
+  .factory('$modalStack', ['$window', '$transition', '$timeout', '$document', '$compile', '$rootScope', '$$stackedMap',
+    function ($window, $transition, $timeout, $document, $compile, $rootScope, $$stackedMap) {
 
       var OPENED_MODAL_CLASS = 'modal-open';
 
@@ -617,7 +1026,6 @@ angular.module('mm.foundation.modal', ['mm.foundation.transition'])
       });
 
       function removeModalWindow(modalInstance) {
-
         var body = $document.find('body').eq(0);
         var modalWindow = openedWindows.get(modalInstance).value;
 
@@ -625,8 +1033,11 @@ angular.module('mm.foundation.modal', ['mm.foundation.transition'])
         openedWindows.remove(modalInstance);
 
         //remove window DOM element
-        removeAfterAnimate(modalWindow.modalDomEl, modalWindow.modalScope, 300, checkRemoveBackdrop);
-        body.toggleClass(OPENED_MODAL_CLASS, openedWindows.length() > 0);
+        removeAfterAnimate(modalWindow.modalDomEl, modalWindow.modalScope, 300, function() {
+          modalWindow.modalScope.$destroy();
+          body.toggleClass(OPENED_MODAL_CLASS, openedWindows.length() > 0);
+          checkRemoveBackdrop();
+        });
       }
 
       function checkRemoveBackdrop() {
@@ -705,8 +1116,19 @@ angular.module('mm.foundation.modal', ['mm.foundation.transition'])
           backdropDomEl = $compile('<div modal-backdrop></div>')(backdropScope);
           body.append(backdropDomEl);
         }
-          
-        var angularDomEl = angular.element('<div modal-window></div>');
+
+        // Create a faux modal div just to measure its
+        // distance to top
+        var faux = angular.element('<div class="reveal-modal" style="z-index:-1""></div>');
+        body.append(faux[0]);
+        var marginTop = parseInt(getComputedStyle(faux[0]).top) || 0;
+        faux.remove();
+
+        // Using pageYOffset instead of scrollY to ensure compatibility with IE
+        var scrollY = $window.pageYOffset || 0;
+        var openAt = scrollY + marginTop;
+
+        var angularDomEl = angular.element('<div modal-window style="visibility: visible; top:' + openAt +'px;"></div>');
         angularDomEl.attr('window-class', modal.windowClass);
         angularDomEl.attr('index', openedWindows.length() - 1);
         angularDomEl.attr('animate', 'animate');
@@ -856,6 +1278,88 @@ angular.module('mm.foundation.modal', ['mm.foundation.transition'])
 
     return $modalProvider;
   });
+
+angular.module("mm.foundation.offcanvas", [])
+    .directive('offCanvasWrap', ['$window', function ($window) {
+        return {
+            scope: {},
+            restrict: 'C',
+            link: function ($scope, element, attrs) {
+                var win = angular.element($window);
+                var sidebar = $scope.sidebar = element;
+
+                $scope.hide = function () {
+                    sidebar.removeClass('move-left');
+                    sidebar.removeClass('move-right');
+                };
+
+                win.bind("resize.body", $scope.hide);
+
+                $scope.$on('$destroy', function() {
+                    win.unbind("resize.body", $scope.hide);
+                });
+
+            },
+            controller: ['$scope', function($scope) {
+
+                this.leftToggle = function() {
+                    $scope.sidebar.toggleClass("move-right");
+                };
+
+                this.rightToggle = function() {
+                    $scope.sidebar.toggleClass("move-left");
+                };
+
+                this.hide = function() {
+                    $scope.hide();
+                };
+            }]
+        };
+    }])
+    .directive('leftOffCanvasToggle', [function () {
+        return {
+            require: '^offCanvasWrap',
+            restrict: 'C',
+            link: function ($scope, element, attrs, offCanvasWrap) {
+                element.on('click', function () {
+                    offCanvasWrap.leftToggle();
+                });
+            }
+        };
+    }])
+    .directive('rightOffCanvasToggle', [function () {
+        return {
+            require: '^offCanvasWrap',
+            restrict: 'C',
+            link: function ($scope, element, attrs, offCanvasWrap) {
+                element.on('click', function () {
+                    offCanvasWrap.rightToggle();
+                });
+            }
+        };
+    }])
+       .directive('exitOffCanvas', [function () {
+        return {
+            require: '^offCanvasWrap',
+            restrict: 'C',
+            link: function ($scope, element, attrs, offCanvasWrap) {
+                element.on('click', function () {
+                    offCanvasWrap.hide();
+                });
+            }
+        };
+    }])
+    .directive('offCanvasList', [function () {
+        return {
+            require: '^offCanvasWrap',
+            restrict: 'C',
+            link: function ($scope, element, attrs, offCanvasWrap) {
+                element.on('click', function () {
+                    offCanvasWrap.hide();
+                });
+            }
+        };
+    }]);
 
 angular.module('mm.foundation.pagination', [])
 
@@ -1391,9 +1895,13 @@ angular.module( 'mm.foundation.tooltip', [ 'mm.foundation.position', 'mm.foundat
               scope.tt_title = val;
             });
 
+            attrs[prefix+'Placement'] = attrs[prefix+'Placement'] || null;
+
             attrs.$observe( prefix+'Placement', function ( val ) {
-              scope.tt_placement = angular.isDefined( val ) ? val : options.placement;
+              scope.tt_placement = angular.isDefined( val ) && val ? val : options.placement;
             });
+
+            attrs[prefix+'PopupDelay'] = attrs[prefix+'PopupDelay'] || null;
 
             attrs.$observe( prefix+'PopupDelay', function ( val ) {
               var delay = parseInt( val, 10 );
@@ -1401,13 +1909,19 @@ angular.module( 'mm.foundation.tooltip', [ 'mm.foundation.position', 'mm.foundat
             });
 
             var unregisterTriggers = function() {
-              if (hasRegisteredTriggers) {
-                element.unbind( triggers.show, showTooltipBind );
-                element.unbind( triggers.hide, hideTooltipBind );
+              if ( hasRegisteredTriggers ) {
+                if ( angular.isFunction( triggers.show ) ) {
+                  unregisterTriggerFunction();
+                } else {
+                  element.unbind( triggers.show, showTooltipBind );
+                  element.unbind( triggers.hide, hideTooltipBind );
+                }
               }
             };
 
             var unregisterTriggerFunction = function () {};
+
+            attrs[prefix+'Trigger'] = attrs[prefix+'Trigger'] || null;
 
             attrs.$observe( prefix+'Trigger', function ( val ) {
               unregisterTriggers();
@@ -1889,8 +2403,11 @@ angular.module('mm.foundation.tabs', [])
         }
 
         scope.$watch('active', function(active) {
+          if( !angular.isFunction(setActive) ){
+            return;
+          }
           // Note this watcher also initializes and assigns scope.active to the
-          // attrs.active expression.
+          // attrs.active expression.          
           setActive(scope.$parent, active);
           if (active) {
             tabsetCtrl.select(scope);
@@ -1975,6 +2492,436 @@ angular.module('mm.foundation.tabs', [])
 
 ;
 
+
+angular.module("mm.foundation.topbar", ['mm.foundation.mediaQueries'])
+    .factory('closest', [function(){
+        return function(el, selector) {
+            var matchesSelector = function (node, selector) {
+                var nodes = (node.parentNode || node.document).querySelectorAll(selector);
+                var i = -1;
+                while (nodes[++i] && nodes[i] != node){}
+                return !!nodes[i];
+            };
+
+            var element = el[0];
+            while (element) {
+                if (matchesSelector(element, selector)) {
+                    return angular.element(element);
+                } else {
+                    element = element.parentElement;
+                }
+            }
+            return false;
+        };
+    }])
+    .directive('topBar', ['$timeout','$compile', '$window', '$document', 'mediaQueries',
+            function ($timeout, $compile, $window, $document, mediaQueries) {
+        return {
+            scope: {
+                stickyClass : '@',
+                backText: '@',
+                stickyOn : '=',
+                customBackText: '=',
+                isHover: '=',
+                mobileShowParentLink: '=',
+                scrolltop : '=',
+            },
+            restrict: 'EA',
+            replace: true,
+            templateUrl: 'template/topbar/top-bar.html',
+            transclude: true,
+            link: function ($scope, element, attrs) {
+                var topbar = $scope.topbar = element;
+                var topbarContainer = topbar.parent();
+                var body = angular.element($document[0].querySelector('body'));
+
+                var isSticky = $scope.isSticky = function () {
+                    var sticky = topbarContainer.hasClass($scope.settings.stickyClass);
+                    if (sticky && $scope.settings.stickyOn === 'all') {
+                        return true;
+                    } else if (sticky && mediaQueries.small() && $scope.settings.stickyOn === 'small') {
+                        return true;
+                    } else if (sticky && mediaQueries.medium() && $scope.settings.stickyOn === 'medium') {
+                        return true;
+                    } else if (sticky && mediaQueries.large() && $scope.settings.stickyOn === 'large') {
+                        return true;
+                    }
+                    return false;
+                };
+
+                var updateStickyPositioning = function(){
+                    if (!$scope.stickyTopbar || !$scope.isSticky()) {
+                        return;
+                    }
+
+                    var $class = angular.element($document[0].querySelector('.' + $scope.settings.stickyClass));
+                    var distance = stickyoffset;
+
+                    if ($window.pageYOffset > distance && !$class.hasClass('fixed')) {
+                        $class.addClass('fixed');
+                        body.css('padding-top', $scope.originalHeight + 'px');
+                    } else if ($window.pageYOffset <= distance && $class.hasClass('fixed')) {
+                        $class.removeClass('fixed');
+                        body.css('padding-top', '');
+                    }
+                };
+
+                $scope.toggle = function(on) {
+                    if(!mediaQueries.topbarBreakpoint()){
+                        return false;
+                    }
+
+                    var expand = (on === undefined) ? !topbar.hasClass('expanded') : on;
+
+                    if (expand){
+                        topbar.addClass('expanded');
+                    }
+                    else {
+                        topbar.removeClass('expanded');
+                    }
+
+                    if ($scope.settings.scrolltop) {
+                        if (!expand && topbar.hasClass('fixed')) {
+                            topbar.parent().addClass('fixed');
+                            topbar.removeClass('fixed');
+                            body.css('padding-top', $scope.originalHeight + 'px');
+                        } else if (expand && topbar.parent().hasClass('fixed')) {
+                            topbar.parent().removeClass('fixed');
+                            topbar.addClass('fixed');
+                            body.css('padding-top', '');
+                            $window.scrollTo(0,0);
+                        }
+                    } else {
+                        if(isSticky()) {
+                            topbar.parent().addClass('fixed');
+                        }
+
+                        if(topbar.parent().hasClass('fixed')) {
+                            if (!expand) {
+                                topbar.removeClass('fixed');
+                                topbar.parent().removeClass('expanded');
+                                updateStickyPositioning();
+                            } else {
+                                topbar.addClass('fixed');
+                                topbar.parent().addClass('expanded');
+                                body.css('padding-top', $scope.originalHeight + 'px');
+                            }
+                        }
+                    }
+                };
+
+                if(topbarContainer.hasClass('fixed') || isSticky() ) {
+                    $scope.stickyTopbar = true;
+                    $scope.height = topbarContainer[0].offsetHeight;
+                    var stickyoffset = topbarContainer[0].getBoundingClientRect().top;
+                } else {
+                    $scope.height = topbar[0].offsetHeight;
+                }
+
+                $scope.originalHeight = $scope.height;
+
+                $scope.$watch('height', function(h){
+                    if(h){
+                        topbar.css('height', h + 'px');
+                    } else {
+                        topbar.css('height', '');
+                    }
+                });
+
+                var lastBreakpoint = mediaQueries.topbarBreakpoint();
+
+                angular.element($window).bind('resize', function(){
+                    var currentBreakpoint = mediaQueries.topbarBreakpoint();
+                    if(lastBreakpoint === currentBreakpoint){
+                        return;
+                    }
+                    lastBreakpoint = mediaQueries.topbarBreakpoint();
+
+                    topbar.removeClass('expanded');
+                    topbar.parent().removeClass('expanded');
+                    $scope.height = '';
+
+                    var sections = angular.element(topbar[0].querySelectorAll('section'));
+                    angular.forEach(sections, function(section){
+                        angular.element(section.querySelectorAll('li.moved')).removeClass('moved');
+                    });
+
+                    $scope.$apply();
+                 });
+
+                // update sticky positioning
+                angular.element($window).bind("scroll", function() {
+                    updateStickyPositioning();
+                    $scope.$apply();
+                });
+
+                $scope.$on('$destroy', function(){
+                    angular.element($window).unbind("scroll");
+                    angular.element($window).unbind("resize");
+                });
+
+                if (topbarContainer.hasClass('fixed')) {
+                    body.css('padding-top', $scope.originalHeight + 'px');
+                }
+
+            },
+            controller: ['$window', '$scope', 'closest', function($window, $scope, closest) {
+                $scope.settings = {};
+                $scope.settings.stickyClass = $scope.stickyClass || 'sticky';
+                $scope.settings.backText = $scope.backText || 'Back';
+                $scope.settings.stickyOn = $scope.stickyOn || 'all';
+
+                $scope.settings.customBackText = $scope.customBackText === undefined ? true : $scope.customBackText;
+                $scope.settings.isHover = $scope.isHover === undefined ? true : $scope.isHover;
+                $scope.settings.mobileShowParentLink = $scope.mobileShowParentLink === undefined ? true : $scope.mobileShowParentLink;
+                $scope.settings.scrolltop = $scope.scrolltop === undefined ? true : $scope.scrolltop; // jump to top when sticky nav menu toggle is clicked
+
+                this.settings = $scope.settings;
+
+                $scope.index = 0;
+
+                var outerHeight = function(el){
+                    var height = el.offsetHeight;
+                    var style = el.currentStyle || getComputedStyle(el);
+
+                    height += parseInt(style.marginTop, 10) + parseInt(style.marginBottom, 10);
+                    return height;
+                };
+
+
+                var sections = [];
+
+                this.addSection = function(section){
+                    sections.push(section);
+                };
+
+                this.removeSection = function(section){
+                    var index = sections.indexOf(section);
+                    if (index > -1) {
+                        sections.splice(index, 1);
+                    }
+                };
+
+                var dir = /rtl/i.test($document.find('html').attr('dir')) ? 'right' : 'left';
+
+                $scope.$watch('index', function(index){
+                    for(var i = 0; i < sections.length; i++){
+                        sections[i].move(dir, index);
+                    }
+                });
+
+                this.toggle = function(on){
+                    $scope.toggle(on);
+                    for(var i = 0; i < sections.length; i++){
+                        sections[i].reset();
+                    }
+                    $scope.index = 0;
+                    $scope.height = '';
+                    $scope.$apply();
+                };
+
+                this.back = function(event) {
+                    if($scope.index < 1 || !mediaQueries.topbarBreakpoint()){
+                        return;
+                    }
+
+                    var $link = angular.element(event.currentTarget);
+                    var $movedLi = closest($link, 'li.moved');
+                    var $previousLevelUl = $movedLi.parent();
+                    $scope.index = $scope.index -1;
+
+                    if($scope.index === 0){
+                        $scope.height = '';
+                    } else {
+                        $scope.height = $scope.originalHeight + outerHeight($previousLevelUl[0]);
+                    }
+
+                    $timeout(function () {
+                        $movedLi.removeClass('moved');
+                    }, 300);
+                };
+
+                this.forward = function(event) {
+                    if(!mediaQueries.topbarBreakpoint()){
+                        return false;
+                    }
+
+                    var $link = angular.element(event.currentTarget);
+                    var $selectedLi = closest($link, 'li');
+                    $selectedLi.addClass('moved');
+                    $scope.height = $scope.originalHeight + outerHeight($link.parent()[0].querySelector('ul'));
+                    $scope.index = $scope.index + 1;
+                    $scope.$apply();
+                };
+
+            }]
+        };
+    }])
+    .directive('toggleTopBar', ['closest', function (closest) {
+        return {
+            scope: {},
+            require: '^topBar',
+            restrict: 'A',
+            replace: true,
+            templateUrl: 'template/topbar/toggle-top-bar.html',
+            transclude: true,
+            link: function ($scope, element, attrs, topBar) {
+                element.bind('click', function(event) {
+                    var li = closest(angular.element(event.currentTarget), 'li');
+                    if(!li.hasClass('back') && !li.hasClass('has-dropdown')) {
+                        topBar.toggle();
+                    }
+                });
+
+                $scope.$on('$destroy', function(){
+                    element.unbind('click');
+                });
+            }
+        };
+    }])
+    .directive('topBarSection', ['$compile', 'closest', function ($compile, closest) {
+        return {
+            scope: {},
+            require: '^topBar',
+            restrict: 'EA',
+            replace: true,
+            templateUrl: 'template/topbar/top-bar-section.html',
+            transclude: true,
+            link: function ($scope, element, attrs, topBar) {
+                var section = element;
+
+                $scope.reset = function(){
+                    angular.element(section[0].querySelectorAll('li.moved')).removeClass('moved');
+                };
+
+                $scope.move = function(dir, index){
+                    if(dir === 'left'){
+                        section.css({"left": index * -100 + '%'});
+                    }
+                    else {
+                        section.css({"right": index * -100 + '%'});
+                    }
+                };
+
+                topBar.addSection($scope);
+
+                $scope.$on("$destroy", function(){
+                    topBar.removeSection($scope);
+                });
+
+                // Top level links close menu on click
+                var links = section[0].querySelectorAll('li>a');
+                angular.forEach(links, function(link){
+                    var $link = angular.element(link);
+                    var li = closest($link, 'li');
+                    if(li.hasClass('has-dropdown') || li.hasClass('back') || li.hasClass('title')){
+                        return;
+                    }
+
+                    $link.bind('click', function(){
+                        topBar.toggle(false);
+                    });
+
+                    $scope.$on('$destroy', function(){
+                        $link.bind('click');
+                    });
+                });
+
+            }
+        };
+    }])
+    .directive('hasDropdown', ['mediaQueries', function (mediaQueries) {
+        return {
+            scope: {},
+            require: '^topBar',
+            restrict: 'A',
+            templateUrl: 'template/topbar/has-dropdown.html',
+            replace: true,
+            transclude: true,
+            link: function ($scope, element, attrs, topBar) {
+                $scope.triggerLink = element.children('a')[0];
+
+                var $link = angular.element($scope.triggerLink);
+
+                $link.bind('click', function(event){
+                    topBar.forward(event);
+                });
+                $scope.$on('$destroy', function(){
+                    $link.unbind('click');
+                });
+
+                element.bind('mouseenter', function() {
+                    if(topBar.settings.isHover && !mediaQueries.topbarBreakpoint()){
+                        element.addClass('not-click');
+                    }
+                });
+                element.bind('click', function(event) {
+                    if(!topBar.settings.isHover && !mediaQueries.topbarBreakpoint()){
+                        element.toggleClass('not-click');
+                    }
+                });
+
+                element.bind('mouseleave', function() {
+                    element.removeClass('not-click');
+                });
+
+                $scope.$on('$destroy', function(){
+                    element.unbind('click');
+                    element.unbind('mouseenter');
+                    element.unbind('mouseleave');
+                });
+            },
+            controller: ['$window', '$scope', function($window, $scope) {
+                this.triggerLink = $scope.triggerLink;
+            }]
+        };
+    }])
+    .directive('topBarDropdown', ['$compile', function ($compile) {
+        return {
+            scope: {},
+            require: ['^topBar', '^hasDropdown'],
+            restrict: 'A',
+            replace: true,
+            templateUrl: 'template/topbar/top-bar-dropdown.html',
+            transclude: true,
+            link: function ($scope, element, attrs, ctrls) {
+
+                var topBar = ctrls[0];
+                var hasDropdown = ctrls[1];
+
+                var $link = angular.element(hasDropdown.triggerLink);
+                var url = $link.attr('href');
+
+                $scope.linkText = $link.text();
+
+                $scope.back = function(event){
+                    topBar.back(event);
+                };
+
+                // Add back link
+                if (topBar.settings.customBackText) {
+                    $scope.backText = topBar.settings.backText;
+                } else {
+                    $scope.backText = '&laquo; ' + $link.html();
+                }
+
+                var $titleLi;
+                if (topBar.settings.mobileShowParentLink && url && url.length > 1) {
+                    $titleLi = angular.element('<li class="title back js-generated">' +
+                        '<h5><a href="#" ng-click="back($event);">{{backText}}</a></h5></li>' +
+                        '<li><a class="parent-link js-generated" href="' +
+                        url + '">{{linkText}}</a></li>');
+                } else {
+                    $titleLi = angular.element('<li class="title back js-generated">' +
+                        '<h5><a href="" ng-click="back($event);">{{backText}}</a></h5></li>');
+                }
+
+                $compile($titleLi)($scope);
+                element.prepend($titleLi);
+            }
+        };
+    }]);
+
 angular.module( 'mm.foundation.tour', [ 'mm.foundation.position', 'mm.foundation.tooltip' ] )
 
 .service( '$tour', [ '$window', function ( $window ) {
@@ -2024,7 +2971,7 @@ angular.module( 'mm.foundation.tour', [ 'mm.foundation.position', 'mm.foundation
   };
 }])
 
-.directive( 'stepPopup', ['$tour', function ( $tour ) {
+.directive( 'stepTextPopup', ['$tour', function ( $tour ) {
   return {
     restrict: 'EA',
     replace: true,
@@ -2048,7 +2995,7 @@ angular.module( 'mm.foundation.tour', [ 'mm.foundation.position', 'mm.foundation
   };
 }])
 
-.directive( 'step', [ '$position', '$tooltip', '$tour', '$window', function ( $position, $tooltip, $tour, $window ) {
+.directive( 'stepText', [ '$position', '$tooltip', '$tour', '$window', function ( $position, $tooltip, $tour, $window ) {
   function isElementInViewport( element ) {
     var rect = element[0].getBoundingClientRect();
 
@@ -2075,11 +3022,11 @@ angular.module( 'mm.foundation.tour', [ 'mm.foundation.position', 'mm.foundation
         return true;
       }
     }
-
+    
     return false;
   }
 
-  return $tooltip( 'step', 'step', show );
+  return $tooltip( 'stepText', 'step', show );
 }]);
 
 angular.module('mm.foundation.typeahead', ['mm.foundation.position', 'mm.foundation.bindHtml'])
@@ -2096,7 +3043,7 @@ angular.module('mm.foundation.typeahead', ['mm.foundation.position', 'mm.foundat
   return {
     parse:function (input) {
 
-      var match = input.match(TYPEAHEAD_REGEXP), modelMapper, viewMapper, source;
+      var match = input.match(TYPEAHEAD_REGEXP);
       if (!match) {
         throw new Error(
           "Expected typeahead specification in form of '_modelValue_ (as _label_)? for _item_ in _collection_'" +
@@ -2225,14 +3172,12 @@ angular.module('mm.foundation.typeahead', ['mm.foundation.position', 'mm.foundat
       //we need to propagate user's query so we can higlight matches
       scope.query = undefined;
 
-      //Declare the timeout promise var outside the function scope so that stacked calls can be cancelled later 
+      //Declare the timeout promise var outside the function scope so that stacked calls can be cancelled later
       var timeoutPromise;
 
       //plug into $parsers pipeline to open a typeahead on view changes initiated from DOM
       //$parsers kick-in on all the changes coming from the view as well as manually triggered by $setViewValue
       modelCtrl.$parsers.unshift(function (inputValue) {
-
-        hasFocus = true;
 
         if (inputValue && inputValue.length >= minSearch) {
           if (waitTime > 0) {
@@ -2344,6 +3289,10 @@ angular.module('mm.foundation.typeahead', ['mm.foundation.position', 'mm.foundat
         hasFocus = false;
       });
 
+      element.bind('focus', function (evt) {
+        hasFocus = true;
+      });
+
       // Keep reference to click handler to unbind it.
       var dismissClickHandler = function (evt) {
         if (element[0] !== evt.target) {
@@ -2431,185 +3380,3 @@ angular.module('mm.foundation.typeahead', ['mm.foundation.position', 'mm.foundat
       return query ? matchItem.replace(new RegExp(escapeRegexp(query), 'gi'), '<strong>$&</strong>') : matchItem;
     };
   });
-
-angular.module("template/accordion/accordion-group.html", []).run(["$templateCache", function($templateCache) {
-  $templateCache.put("template/accordion/accordion-group.html",
-    "<dd>\n" +
-    "  <a ng-click=\"isOpen = !isOpen\" accordion-transclude=\"heading\">{{heading}}</a>\n" +
-    "  <div class=\"content\" ng-style=\"isOpen ? {display: 'block'} : {}\" ng-transclude></div>\n" +
-    "</dd>\n" +
-    "");
-}]);
-
-angular.module("template/accordion/accordion.html", []).run(["$templateCache", function($templateCache) {
-  $templateCache.put("template/accordion/accordion.html",
-    "<dl class=\"accordion\" ng-transclude></div>\n" +
-    "");
-}]);
-
-angular.module("template/alert/alert.html", []).run(["$templateCache", function($templateCache) {
-  $templateCache.put("template/alert/alert.html",
-    "<div class='alert-box' ng-class='(type || \"\")'>\n" +
-    "  <span ng-transclude></span>\n" +
-    "  <a ng-show='closeable' class='close' ng-click='close()'>&times;</a>\n" +
-    "</div>\n" +
-    "");
-}]);
-
-angular.module("template/modal/backdrop.html", []).run(["$templateCache", function($templateCache) {
-  $templateCache.put("template/modal/backdrop.html",
-    "<div class=\"reveal-modal-bg fade\" ng-class=\"{in: animate}\" ng-click=\"close($event)\" style=\"display: block\"></div>\n" +
-    "");
-}]);
-
-angular.module("template/modal/window.html", []).run(["$templateCache", function($templateCache) {
-  $templateCache.put("template/modal/window.html",
-    "<div tabindex=\"-1\" class=\"reveal-modal fade {{ windowClass }}\"\n" +
-    "  ng-class=\"{in: animate}\" ng-click=\"close($event)\"\n" +
-    "  style=\"display: block; position: fixed; visibility: visible\">\n" +
-    "  <div ng-transclude></div>\n" +
-    "</div>\n" +
-    "");
-}]);
-
-angular.module("template/pagination/pager.html", []).run(["$templateCache", function($templateCache) {
-  $templateCache.put("template/pagination/pager.html",
-    "<ul class=\"pagination\">\n" +
-    "  <li ng-repeat=\"page in pages\" class=\"arrow\" ng-class=\"{unavailable: page.disabled, left: page.previous, right: page.next}\"><a ng-click=\"selectPage(page.number)\">{{page.text}}</a></li>\n" +
-    "</ul>\n" +
-    "");
-}]);
-
-angular.module("template/pagination/pagination.html", []).run(["$templateCache", function($templateCache) {
-  $templateCache.put("template/pagination/pagination.html",
-    "<ul class=\"pagination\">\n" +
-    "  <li ng-repeat=\"page in pages\" ng-class=\"{arrow: $first || $last, current: page.active, unavailable: page.disabled}\"><a ng-click=\"selectPage(page.number)\">{{page.text}}</a></li>\n" +
-    "</ul>\n" +
-    "");
-}]);
-
-angular.module("template/tooltip/tooltip-html-unsafe-popup.html", []).run(["$templateCache", function($templateCache) {
-  $templateCache.put("template/tooltip/tooltip-html-unsafe-popup.html",
-    "<span class=\"tooltip tip-{{placement}}\"\n" +
-    "  ng-class=\"{ in: isOpen(), fade: animation() }\"\n" +
-    "  style=\"width: auto\">\n" +
-    "  <span bind-html-unsafe=\"content\"></span>\n" +
-    "  <span class=\"nub\"></span>\n" +
-    "</span>\n" +
-    "");
-}]);
-
-angular.module("template/tooltip/tooltip-popup.html", []).run(["$templateCache", function($templateCache) {
-  $templateCache.put("template/tooltip/tooltip-popup.html",
-    "<span class=\"tooltip tip-{{placement}}\"\n" +
-    "  ng-class=\"{ in: isOpen(), fade: animation() }\"\n" +
-    "  style=\"width: auto\">\n" +
-    "  <span ng-bind=\"content\"></span>\n" +
-    "  <span class=\"nub\"></span>\n" +
-    "</span>\n" +
-    "");
-}]);
-
-angular.module("template/popover/popover.html", []).run(["$templateCache", function($templateCache) {
-  $templateCache.put("template/popover/popover.html",
-    "<div class=\"joyride-tip-guide\" ng-class=\"{ in: isOpen(), fade: animation() }\">\n" +
-    "  <span class=\"joyride-nub\" ng-class=\"{\n" +
-    "    bottom: placement === 'top',\n" +
-    "    left: placement === 'right',\n" +
-    "    right: placement === 'left',\n" +
-    "    top: placement === 'bottom'\n" +
-    "  }\"></span>\n" +
-    "  <div class=\"joyride-content-wrapper\">\n" +
-    "    <h4 ng-bind=\"title\" ng-show=\"title\"></h4>\n" +
-    "    <p ng-bind=\"content\"></p>\n" +
-    "  </div>\n" +
-    "</div>\n" +
-    "");
-}]);
-
-angular.module("template/progressbar/bar.html", []).run(["$templateCache", function($templateCache) {
-  $templateCache.put("template/progressbar/bar.html",
-    "<span class=\"meter\" ng-transclude></span>\n" +
-    "");
-}]);
-
-angular.module("template/progressbar/progress.html", []).run(["$templateCache", function($templateCache) {
-  $templateCache.put("template/progressbar/progress.html",
-    "<div class=\"progress\" ng-class=\"type\" ng-transclude></div>\n" +
-    "");
-}]);
-
-angular.module("template/progressbar/progressbar.html", []).run(["$templateCache", function($templateCache) {
-  $templateCache.put("template/progressbar/progressbar.html",
-    "<div class=\"progress\" ng-class=\"type\">\n" +
-    "  <span class=\"meter\" ng-transclude></span>\n" +
-    "</div>\n" +
-    "");
-}]);
-
-angular.module("template/rating/rating.html", []).run(["$templateCache", function($templateCache) {
-  $templateCache.put("template/rating/rating.html",
-    "<span ng-mouseleave=\"reset()\">\n" +
-    "  <i ng-repeat=\"r in range\" ng-mouseenter=\"enter($index + 1)\" ng-click=\"rate($index + 1)\" class=\"fa\"\n" +
-    "    ng-class=\"$index < val && (r.stateOn || 'fa-star') || (r.stateOff || 'fa-star-o')\"></i>\n" +
-    "</span>\n" +
-    "");
-}]);
-
-angular.module("template/tabs/tab.html", []).run(["$templateCache", function($templateCache) {
-  $templateCache.put("template/tabs/tab.html",
-    "<dd ng-class=\"{active: active}\">\n" +
-    "  <a ng-click=\"select()\" tab-heading-transclude>{{heading}}</a>\n" +
-    "</dd>\n" +
-    "");
-}]);
-
-angular.module("template/tabs/tabset.html", []).run(["$templateCache", function($templateCache) {
-  $templateCache.put("template/tabs/tabset.html",
-    "<div class=\"tabbable\">\n" +
-    "  <dl class=\"tabs\" ng-class=\"{'vertical': vertical}\" ng-transclude></dl>\n" +
-    "  <div class=\"tabs-content\">\n" +
-    "    <div class=\"content\" \n" +
-    "      ng-repeat=\"tab in tabs\" \n" +
-    "      ng-class=\"{active: tab.active}\">\n" +
-    "      <div tab-content-transclude=\"tab\"></div>\n" +
-    "    </div>\n" +
-    "  </div>\n" +
-    "</div>\n" +
-    "");
-}]);
-
-angular.module("template/tour/tour.html", []).run(["$templateCache", function($templateCache) {
-  $templateCache.put("template/tour/tour.html",
-    "<div class=\"joyride-tip-guide\" ng-class=\"{ in: isOpen(), fade: animation() }\">\n" +
-    "  <span class=\"joyride-nub\" ng-class=\"{\n" +
-    "    bottom: placement === 'top',\n" +
-    "    left: placement === 'right',\n" +
-    "    right: placement === 'left',\n" +
-    "    top: placement === 'bottom'\n" +
-    "  }\"></span>\n" +
-    "  <div class=\"joyride-content-wrapper\">\n" +
-    "    <h4 ng-bind=\"title\" ng-show=\"title\"></h4>\n" +
-    "    <p ng-bind=\"content\"></p>\n" +
-    "    <a class=\"small button joyride-next-tip\" ng-show=\"!isLastStep()\" ng-click=\"nextStep()\">Next</a>\n" +
-    "    <a class=\"small button joyride-next-tip\" ng-show=\"isLastStep()\" ng-click=\"endTour()\">End</a>\n" +
-    "    <a class=\"joyride-close-tip\" ng-click=\"endTour()\">&times;</a>\n" +
-    "  </div>\n" +
-    "</div>\n" +
-    "");
-}]);
-
-angular.module("template/typeahead/typeahead-match.html", []).run(["$templateCache", function($templateCache) {
-  $templateCache.put("template/typeahead/typeahead-match.html",
-    "<a tabindex=\"-1\" bind-html-unsafe=\"match.label | typeaheadHighlight:query\"></a>");
-}]);
-
-angular.module("template/typeahead/typeahead-popup.html", []).run(["$templateCache", function($templateCache) {
-  $templateCache.put("template/typeahead/typeahead-popup.html",
-    "<ul class=\"f-dropdown\" ng-style=\"{display: isOpen()&&'block' || 'none', top: position.top+'px', left: position.left+'px'}\">\n" +
-    "    <li ng-repeat=\"match in matches\" ng-class=\"{active: isActive($index) }\" ng-mouseenter=\"selectActive($index)\" ng-click=\"selectMatch($index)\">\n" +
-    "        <div typeahead-match index=\"$index\" match=\"match\" query=\"query\" template-url=\"templateUrl\"></div>\n" +
-    "    </li>\n" +
-    "</ul>\n" +
-    "");
-}]);
